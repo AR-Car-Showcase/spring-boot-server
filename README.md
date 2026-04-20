@@ -196,43 +196,48 @@ sequenceDiagram
 ```mermaid
 classDiagram
     class AuthController {
-        +signin(LoginRequest) ResponseEntity
-        +signup(SignupRequest) ResponseEntity
+        +authenticateUser(LoginRequest) ResponseEntity
+        +registerUser(SignupRequest) ResponseEntity
     }
 
     class CarController {
-        +getAllCars() List~Car~
-        +getCarById(id) Car
-        +searchCars(query) List~Car~
-        +filterCars(params) List~Car~
+        +allCars() ResponseEntity~List~Car~~
+        +getCarsById(id) Car
+        +allBrands() ResponseEntity~List~String~~
+        +allModels(brand) ResponseEntity
+        +allVariants(brand, model) ResponseEntity
+        +getVariant(brand, model, variant) ResponseEntity
     }
 
     class CustomizationController {
-        +saveCustomization(request) Customization
-        +getUserCustomizations(userId) List~Customization~
-        +getCustomizationById(id) Customization
+        +createCustomization(CustomizationRequest) ResponseEntity
+        +getUserCustomizations() ResponseEntity
     }
 
     class AuthService {
-        +authenticateUser(username, password) JwtResponse
+        +authenticateUser(LoginRequest) JwtResponse
         +registerUser(SignupRequest) MessageResponse
     }
 
     class CarService {
-        +findAll() List~Car~
-        +findById(id) Car
-        +search(query) List~Car~
+        <<interface>>
+        +GetAllCars() List~Car~
+        +searchCars(keyword) List~Car~
+        +getCarsById(id) Car
+        +getAllBrands() List~String~
+        +getAllModels(brand) List~String~
+        +getAllVariants(brand, model) List~CarVariant~
+        +getVariant(brand, model, variant) CarVariant
     }
 
     class CustomizationService {
-        +saveCustomization(userId, carId, materials) Customization
-        -callBlenderService(vehicleId, materials) String
+        +createCustomization(CustomizationRequest) CustomizationResponse
+        +getUserCustomizations() List~CustomizationResponse~
     }
 
     class RecommendationService {
+        +getRecommendedCars(carId) List~Car~
         +getPersonalizedRecommendations(userId) List~Car~
-        +getSimilarCars(carId) List~Car~
-        +recordInteraction(userId, carId, type) void
     }
 
     class User {
@@ -240,10 +245,15 @@ classDiagram
         +String username
         +String email
         +String password
-        +Set~Role~ roles
-        +List~String~ favBrands
-        +List~String~ preferredBodyTypes
+        +String phoneNumber
+        +String profilePic
+        +Set~String~ favBrands
+        +Set~String~ preferredBodyTypes
+        +Set~String~ preferredFuelTypes
+        +Set~String~ preferredTransmissions
+        +String drivingCondition
         +Double maxBudget
+        +Set~Role~ roles
     }
 
     class Car {
@@ -253,24 +263,24 @@ classDiagram
         +String fuelType
         +String transmissionType
         +String bodyType
-        +Double price
-        +String model3D
-        +CarImages images
+        +Double minPriceLakhs
+        +Double maxPriceLakhs
+        +String modelUrl
     }
 
     class Customization {
-        +Long id
-        +Long userId
-        +Long carId
-        +Map~String,String~ materials
-        +String generatedModelUrl
+        +UUID id
+        +User user
+        +String vehicleId
+        +String materials
+        +String modelUrl
         +LocalDateTime createdAt
     }
 
     class JwtUtils {
         +generateJwtToken(auth) String
         +validateJwtToken(token) boolean
-        +getUsernameFromToken(token) String
+        +getUserNameFromJwtToken(token) String
     }
 
     class AuthTokenFilter {
@@ -284,6 +294,7 @@ classDiagram
     AuthService --> User
     CarService --> Car
     CustomizationService --> Customization
+    Customization --> User
     AuthTokenFilter --> JwtUtils
 ```
 

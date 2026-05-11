@@ -10,7 +10,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/api/models/**")
-                .addResourceLocations("file:./blender-service/generated/");
+                .addResourceLocations("file:/shared/generated/");
     }
 
     @Override

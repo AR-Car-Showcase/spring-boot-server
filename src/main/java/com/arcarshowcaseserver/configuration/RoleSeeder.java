@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 @Configuration
 @RequiredArgsConstructor
@@ -25,7 +26,16 @@ public class RoleSeeder implements CommandLineRunner {
     }
 
     private void seedRoleIfMissing(RoleType roleType) {
-        if (roleRepository.findByName(roleType).isPresent()) {
+        List<Role> roles = roleRepository.findAllByName(roleType);
+        if (roles.size() > 1) {
+            for (int i = 1; i < roles.size(); i++) {
+                roleRepository.delete(roles.get(i));
+            }
+            log.warn(">>> Removed {} duplicate '{}' role rows", roles.size() - 1, roleType);
+            return;
+        }
+
+        if (roles.size() == 1) {
             return;
         }
 

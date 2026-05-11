@@ -19,9 +19,10 @@ services:
       - FLASK_ENV=production
       - BASE_MODELS_DIR=/app/src/main/resources/static/models
       - CAR_MODEL_NAME=car.glb
+      - GENERATED_DIR=/shared/generated
     volumes:
       - ./src/main/resources/static/models:/app/src/main/resources/static/models
-      - blender_generated:/app/blender-service/generated
+      - blender_generated:/shared/generated
     ports:
       - "5000:5000"
 
@@ -54,6 +55,7 @@ services:
       - "8080:8080"
     volumes:
       - ./src/main/resources/static/models:/app/src/main/resources/static/models
+      - blender_generated:/shared/generated
 
 volumes:
   postgres_data:

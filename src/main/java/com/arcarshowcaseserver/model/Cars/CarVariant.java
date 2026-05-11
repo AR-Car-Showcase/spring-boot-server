@@ -10,7 +10,7 @@ import java.util.List;
 
 @Entity
 @Table(
-        name = "car_variants_v2",
+        name = "car_variants",
         indexes = {
                 @Index(name = "idx_variant", columnList = "variant")
         }
@@ -39,7 +39,7 @@ public class CarVariant {
 
     @ElementCollection
     @CollectionTable(
-            name = "variant_key_specifications_v2",
+            name = "variant_key_specifications",
             joinColumns = @JoinColumn(name = "variant_id")
     )
     @Column(name = "specification", columnDefinition = "TEXT")

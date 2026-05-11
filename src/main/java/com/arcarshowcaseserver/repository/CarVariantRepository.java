@@ -66,7 +66,7 @@ List<CarVariant> findVariantsByCarId(@Param("carId") Long carId);
     @Query(
             value = """
     SELECT *
-    FROM car_variants_v2
+    FROM car_variants
     WHERE CAST(
         REGEXP_REPLACE(price, '[^0-9.]', '', 'g')
         AS DOUBLE PRECISION
@@ -89,7 +89,7 @@ List<CarVariant> findVariantsByCarId(@Param("carId") Long carId);
     @Query(
             value = """
         SELECT *
-        FROM car_variants_v2 v
+        FROM car_variants v
         WHERE (:fuel IS NULL OR LOWER(v.fuel) = LOWER(:fuel))
           AND (:engine IS NULL OR LOWER(v.engine_cc) LIKE LOWER(CONCAT('%', :engine, '%')))
           AND (:maxPrice IS NULL OR

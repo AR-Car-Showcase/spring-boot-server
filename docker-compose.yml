@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-car_data}
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  blender:
+    build: ./blender-service
+    environment:
+      - FLASK_ENV=production
+      - BASE_MODELS_DIR=/app/src/main/resources/static/models
+      - CAR_MODEL_NAME=car.glb
+    volumes:
+      - ./src/main/resources/static/models:/app/src/main/resources/static/models
+      - blender_generated:/app/blender-service/generated
+    ports:
+      - "5000:5000"
+
+  recommendation:
+    build: ./car-recommendation-service
+    environment:
+      - APP_ENV=production
+    ports:
+      - "8000:8000"
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      blender:
+        condition: service_started
+      recommendation:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-car_data}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      BLENDER_SERVICE_URL: http://blender:5000
+      ML_SERVICE_URL: http://recommendation:8000
+      ML_SERVICE_KEY: ${ML_SERVICE_KEY:-carshowcase_internal_2026}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src/main/resources/static/models:/app/src/main/resources/static/models
+
+volumes:
+  postgres_data:
+  blender_generated:

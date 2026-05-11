@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "cars_v2")
+@Table(name = "cars")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -48,4 +48,3 @@ public class Car {
     @OneToMany(mappedBy = "car", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CarColor> colors = new ArrayList<>();
 }
-

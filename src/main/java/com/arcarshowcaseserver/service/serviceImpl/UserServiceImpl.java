@@ -7,7 +7,6 @@ import com.arcarshowcaseserver.payload.response.MessageResponse;
 import com.arcarshowcaseserver.repository.CustomizationRepository;
 import com.arcarshowcaseserver.repository.LikeRepository;
 import com.arcarshowcaseserver.repository.UserRepository;
-import com.arcarshowcaseserver.security.services.UserDetailsImpl;
 import com.arcarshowcaseserver.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,8 +24,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public MessageResponse updateProfile(UserDetailsImpl userDetails, UserPreferencesDTO profileDTO) {
-        User user = userRepository.findById(userDetails.getId())
+    public MessageResponse updateProfile(Long userId, UserPreferencesDTO profileDTO) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
 
         if (profileDTO.getFavBrands() != null) {
@@ -49,8 +48,8 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public UserProfileDTO getProfile(UserDetailsImpl userDetails) {
-        User user = userRepository.findById(userDetails.getId())
+    public UserProfileDTO getProfile(Long userId) {
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
 
         long savedCount = likeRepository.countByUser(user);

@@ -9,7 +9,7 @@ import com.arcarshowcaseserver.model.Cars.Car;
 import com.arcarshowcaseserver.repository.CarRepository;
 import com.arcarshowcaseserver.repository.CustomizationRepository;
 import com.arcarshowcaseserver.repository.UserRepository;
-import com.arcarshowcaseserver.security.services.UserDetailsImpl;
+import com.arcarshowcaseserver.security.CurrentAuthenticatedUserService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,8 +20,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +39,7 @@ public class CustomizationService {
     private final CarRepository carRepository;
     private final UserRepository userRepository;
     private final RestTemplate restTemplate;
+    private final CurrentAuthenticatedUserService currentAuthenticatedUserService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${blender.service.url}")
@@ -150,10 +149,8 @@ public class CustomizationService {
     }
 
     private User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-
-        return userRepository.findById(userDetails.getId())
+        Long userId = currentAuthenticatedUserService.requireCurrentUserIdAsLong();
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 }

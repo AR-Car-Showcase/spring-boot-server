@@ -5,8 +5,10 @@ import com.arcarshowcaseserver.dto.InteractionDTO;
 import com.arcarshowcaseserver.exceptions.BadRequestException;
 import com.arcarshowcaseserver.exceptions.ResourceNotFoundException;
 import com.arcarshowcaseserver.model.Cars.Car;
+import com.arcarshowcaseserver.security.CurrentAuthenticatedUserService;
 import com.arcarshowcaseserver.service.CarService;
 import com.arcarshowcaseserver.service.RecommendationService;
+import com.sricharan.security.core.annotation.RequirePermission;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
@@ -24,10 +26,14 @@ public class CarController {
 
     private final CarService carService;
     private final RecommendationService recommendationService;
+    private final CurrentAuthenticatedUserService currentAuthenticatedUserService;
 
-    public CarController(CarService carService, RecommendationService recommendationService) {
+    public CarController(CarService carService,
+                         RecommendationService recommendationService,
+                         CurrentAuthenticatedUserService currentAuthenticatedUserService) {
         this.carService = carService;
         this.recommendationService = recommendationService;
+        this.currentAuthenticatedUserService = currentAuthenticatedUserService;
     }
 
     @GetMapping("/allcars")
@@ -198,24 +204,20 @@ public class CarController {
         return ResponseEntity.ok(recommendations);
     }
 
+    @RequirePermission("profile:read")
     @GetMapping("/recommendations/personalized")
-    public ResponseEntity<List<Car>> getPersonalizedRecommendations(@org.springframework.security.core.annotation.AuthenticationPrincipal com.arcarshowcaseserver.security.services.UserDetailsImpl userDetails) {
-        if (userDetails == null) {
-             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        Long userId = userDetails.getId();
+    public ResponseEntity<List<Car>> getPersonalizedRecommendations() {
+        Long userId = currentAuthenticatedUserService.requireCurrentUserIdAsLong();
         List<Car> recommendations = recommendationService.getPersonalizedRecommendations(userId);
         return ResponseEntity.ok(recommendations);
     }
 
+    @RequirePermission("recommendation:feedback")
     @PostMapping("/recommendations/feedback")
     public ResponseEntity<?> recordFeedback(
-            @org.springframework.security.core.annotation.AuthenticationPrincipal com.arcarshowcaseserver.security.services.UserDetailsImpl userDetails,
             @RequestBody InteractionDTO interaction) {
-        if (userDetails == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        recommendationService.recordInteraction(userDetails.getId(), interaction.getCarId(), interaction.getAction());
+        Long userId = currentAuthenticatedUserService.requireCurrentUserIdAsLong();
+        recommendationService.recordInteraction(userId, interaction.getCarId(), interaction.getAction());
         return ResponseEntity.ok(Map.of("status", "recorded"));
     }
 

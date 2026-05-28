@@ -10,7 +10,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/search/cars")
-@CrossOrigin(origins = "*")
 public class CarSearchController {
 
     private final CarSearchService carSearchService;

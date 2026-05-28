@@ -11,10 +11,8 @@ import com.arcarshowcaseserver.model.User;
 import com.arcarshowcaseserver.repository.CarRepository;
 import com.arcarshowcaseserver.repository.LikeRepository;
 import com.arcarshowcaseserver.repository.UserRepository;
+import com.arcarshowcaseserver.security.CurrentAuthenticatedUserService;
 import com.arcarshowcaseserver.service.LikeService;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -27,10 +25,16 @@ public class LikeServiceImpl implements LikeService {
     private final UserRepository userRepository;
     private final LikeRepository likeRepository;
     private final CarRepository carRepository;
-    public LikeServiceImpl(UserRepository userRepository, LikeRepository likeRepository, CarRepository carRepository) {
+    private final CurrentAuthenticatedUserService currentAuthenticatedUserService;
+
+    public LikeServiceImpl(UserRepository userRepository,
+                           LikeRepository likeRepository,
+                           CarRepository carRepository,
+                           CurrentAuthenticatedUserService currentAuthenticatedUserService) {
         this.userRepository = userRepository;
         this.likeRepository = likeRepository;
         this.carRepository = carRepository;
+        this.currentAuthenticatedUserService = currentAuthenticatedUserService;
     }
 
 
@@ -85,13 +89,9 @@ public class LikeServiceImpl implements LikeService {
     }
 
     private User retriveLoggedInUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if(authentication == null || !authentication.isAuthenticated())
-            throw new BadCredentialsException("Bad Credentials login ");
-        String username = authentication.getName();
-        System.out.println("Logged in user: " + username);
-        Optional<User> user = userRepository.findByUsername(username);
-        if(user.isEmpty()){
+        Long userId = currentAuthenticatedUserService.requireCurrentUserIdAsLong();
+        Optional<User> user = userRepository.findById(userId);
+        if (user.isEmpty()) {
             throw new UsernameNotFoundException("User Not Found");
         }
         return user.get();

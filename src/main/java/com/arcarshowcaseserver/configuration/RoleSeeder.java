@@ -21,7 +21,7 @@ public class RoleSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        seedRoleIfMissing(RoleType.USER);
+        seedRoleIfMissing(RoleType.DEFAULT);
         seedRoleIfMissing(RoleType.ADMIN);
     }
 

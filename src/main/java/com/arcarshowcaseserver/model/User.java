@@ -63,11 +63,16 @@ public class User {
 
     private Double maxBudget;
 
-    @ManyToMany(fetch = FetchType.LAZY)
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(  name = "user_roles", 
         joinColumns = @JoinColumn(name = "user_id"), 
         inverseJoinColumns = @JoinColumn(name = "role_id"))
     private Set<com.arcarshowcaseserver.model.Role> roles = new HashSet<>();
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_permissions", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "permission", length = 100)
+    private Set<String> permissions = new HashSet<>();
 
     public User(String username, String email, String password) {
         this.username = username;

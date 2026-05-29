@@ -5,6 +5,7 @@ import com.arcarshowcaseserver.repository.CustomizationRepository;
 import com.arcarshowcaseserver.repository.LikeRepository;
 import com.arcarshowcaseserver.repository.UserRepository;
 import com.arcarshowcaseserver.service.CarImportService;
+import com.arcarshowcaseserver.service.verification.EmailVerificationSender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,12 +19,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -43,7 +46,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "security.jwt.expiration-ms=3600000",
         "security.jwt.refresh-expiration-ms=604800000",
         "security.jwt.issuer=ar-car-showcase-server-test",
-        "security.public-endpoints=/api/auth/signup",
+        "security.public-endpoints=/api/auth/signup,/api/auth/verify-email,/api/auth/resend-verification",
+        "app.signup.verification.smtp-enabled=false",
+        "app.signup.verification.store-mode=INMEMORY",
         "app.cors.allowed-origins=http://localhost:8081",
         "spring.ai.openai.api-key=test-key",
         "blender.service.url=http://localhost:5000",
@@ -77,6 +82,9 @@ class SecurityFlowIntegrationTest {
     @MockBean
     private org.springframework.web.client.RestTemplate restTemplate;
 
+    @MockBean
+    private EmailVerificationSender emailVerificationSender;
+
     private Long seededCarId;
 
     @BeforeEach
@@ -106,6 +114,8 @@ class SecurityFlowIntegrationTest {
 
     @Test
     void starterAuthFlowAndProtectedEndpointsWork() throws Exception {
+        var otpCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -115,6 +125,35 @@ class SecurityFlowIntegrationTest {
                                   "password": "Pass@1234"
                                 }
                                 """))
+                .andExpect(status().isOk());
+
+        verify(emailVerificationSender).sendVerificationCode(
+                eq("security_user@example.com"),
+                eq("security_user"),
+                otpCaptor.capture(),
+                eq(Duration.ofMinutes(10))
+        );
+
+        String verificationCode = otpCaptor.getValue();
+        assertThat(verificationCode).isNotBlank();
+
+        mockMvc.perform(post("/api/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "security_user@example.com"
+                                }
+                                """))
+                .andExpect(status().isTooManyRequests());
+
+        mockMvc.perform(post("/api/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "security_user@example.com",
+                                  "code": "%s"
+                                }
+                                """.formatted(verificationCode)))
                 .andExpect(status().isOk());
 
         JsonNode loginResponse = objectMapper.readTree(
@@ -233,6 +272,34 @@ class SecurityFlowIntegrationTest {
         assertThat(customizations.isArray()).isTrue();
         assertThat(customizations.size()).isEqualTo(1);
 
+        mockMvc.perform(post("/api/customizations")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "vehicleId": "%s",
+                                  "materials": {
+                                    "seat": "suede",
+                                    "body": "deep red"
+                                  }
+                                }
+                                """.formatted(seededCarId)))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/customizations")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "vehicleId": "%s",
+                                  "materials": {
+                                    "seat": "alcantara",
+                                    "body": "chrome"
+                                  }
+                                }
+                                """.formatted(seededCarId)))
+                .andExpect(status().isTooManyRequests());
+
         JsonNode refreshed = objectMapper.readTree(
                 mockMvc.perform(post("/refresh")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -271,5 +338,19 @@ class SecurityFlowIntegrationTest {
                                 }
                                 """.formatted(refreshedRefreshToken)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void disposableEmailIsRejectedBeforeAccountCreation() throws Exception {
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "temp_user",
+                                  "email": "temp_user@mailinator.com",
+                                  "password": "Pass@1234"
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -1,6 +1,7 @@
 package com.arcarshowcaseserver.exceptions;
 
 import org.apache.coyote.BadRequestException;
+import com.sricharan.security.core.exception.SecurityAuthorizationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -39,7 +40,7 @@ public class GlobalExceptionHandler {
         error.put("error", "Validation Error");
         error.put("message", ex.getReason());
 
-        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(error, ex.getStatusCode());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -48,6 +49,14 @@ public class GlobalExceptionHandler {
         error.put("error", "Not Found");
         error.put("message", ex.getMessage());
         return new ResponseEntity<>(error, HttpStatus.NOT_FOUND);
+    }
+
+    @ExceptionHandler(SecurityAuthorizationException.class)
+    public ResponseEntity<Map<String, String>> handleSecurityAuthorization(SecurityAuthorizationException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "Forbidden");
+        error.put("message", ex.getMessage());
+        return new ResponseEntity<>(error, HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(Exception.class)

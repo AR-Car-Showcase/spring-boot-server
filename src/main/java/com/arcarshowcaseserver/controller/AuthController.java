@@ -1,6 +1,9 @@
 package com.arcarshowcaseserver.controller;
 
 import com.arcarshowcaseserver.payload.request.SignupRequest;
+import com.arcarshowcaseserver.payload.request.EmailVerificationRequest;
+import com.arcarshowcaseserver.payload.request.ResendVerificationRequest;
+import com.arcarshowcaseserver.payload.response.EmailVerificationResponse;
 import com.arcarshowcaseserver.payload.response.MessageResponse;
 import com.arcarshowcaseserver.service.AuthService;
 import jakarta.validation.Valid;
@@ -19,11 +22,17 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signup")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
-        try {
-            return ResponseEntity.ok(authService.registerUser(signUpRequest));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(new MessageResponse(e.getMessage()));
-        }
+    public ResponseEntity<EmailVerificationResponse> registerUser(@Valid @RequestBody SignupRequest signUpRequest) {
+        return ResponseEntity.ok(authService.registerUser(signUpRequest));
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<MessageResponse> verifyEmail(@Valid @RequestBody EmailVerificationRequest request) {
+        return ResponseEntity.ok(authService.verifyEmail(request));
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<EmailVerificationResponse> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        return ResponseEntity.ok(authService.resendVerification(request));
     }
 }

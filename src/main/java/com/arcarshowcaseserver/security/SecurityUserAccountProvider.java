@@ -136,10 +136,10 @@ public class SecurityUserAccountProvider implements UserAccountProvider, Externa
         created.setEmailVerified(true);
         created.setProfileCompleted(false);
 
-        Role defaultRole = roleRepository.findByName(RoleType.DEFAULT)
-                .orElseThrow(() -> new IllegalStateException("DEFAULT role not found"));
-        created.setRoles(Set.of(defaultRole));
-        created.setPermissions(SecurityRolePermissionMapper.permissionsForRoles(Set.of(RoleType.DEFAULT.name())));
+        Role userRole = roleRepository.findByName(RoleType.USER)
+                .orElseThrow(() -> new IllegalStateException("USER role not found"));
+        created.setRoles(Set.of(userRole));
+        created.setPermissions(SecurityRolePermissionMapper.permissionsForRoles(Set.of(RoleType.USER.name())));
 
         return toUserAccount(userRepository.save(created));
     }

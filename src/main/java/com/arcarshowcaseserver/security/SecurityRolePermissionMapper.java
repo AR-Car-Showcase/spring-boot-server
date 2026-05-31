@@ -21,7 +21,7 @@ public final class SecurityRolePermissionMapper {
             return permissions;
         }
 
-        if (roles.contains("DEFAULT")) {
+        if (roles.contains("USER")) {
             permissions.addAll(PermissionType.userDefaults());
         }
 

@@ -61,12 +61,12 @@ public class AuthService {
         user.setProfilePic(signUpRequest.getProfilePic());
 
         Set<Role> roles = new HashSet<>();
-        Role userRole = roleRepository.findByName(RoleType.DEFAULT)
-                .orElseThrow(() -> new IllegalStateException("DEFAULT role is not found."));
+        Role userRole = roleRepository.findByName(RoleType.USER)
+                .orElseThrow(() -> new IllegalStateException("USER role is not found."));
         roles.add(userRole);
 
         user.setRoles(roles);
-        user.setPermissions(SecurityRolePermissionMapper.permissionsForRoles(Set.of(RoleType.DEFAULT.name())));
+        user.setPermissions(SecurityRolePermissionMapper.permissionsForRoles(Set.of(RoleType.USER.name())));
         User saved = userRepository.save(user);
 
         return emailVerificationService.issueVerificationCode(saved);

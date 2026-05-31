@@ -47,7 +47,7 @@ class SecuritySessionAdminApiIntegrationTest {
 
     @Test
     void adminCanListAndRevokeSessions() throws Exception {
-        Role defaultRole = ensureRole(RoleType.DEFAULT);
+        Role defaultRole = ensureRole(RoleType.USER);
         Role adminRole = ensureRole(RoleType.ADMIN);
 
         String userPassword = "Pass@123";

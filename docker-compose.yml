@@ -14,7 +14,7 @@ services:
       retries: 5
 
   blender:
-    build: ./blender-service
+    build: ../blender-service
     environment:
       - FLASK_ENV=production
       - BASE_MODELS_DIR=/app/src/main/resources/static/models
@@ -27,7 +27,7 @@ services:
       - "5000:5000"
 
   recommendation:
-    build: ./car-recommendation-service
+    build: ../recommendation-service
     environment:
       - APP_ENV=production
     ports:

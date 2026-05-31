@@ -32,6 +32,8 @@ services:
       - APP_ENV=production
     ports:
       - "8000:8000"
+    volumes:
+      - ./src/main/resources/cars_data_final.json:/app/dataset/cars_data_final.json
 
   app:
     build: .

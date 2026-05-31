@@ -15,7 +15,11 @@ public class UserProfileDTO {
     private Long id;
     private String username;
     private String email;
+    private String authProvider;
+    private Boolean profileCompleted;
+    private String displayName;
     private String phoneNumber;
+    private String bio;
     private String profilePic;
     private Set<String> favBrands;
     private Set<String> preferredBodyTypes;

@@ -1,5 +1,6 @@
 package com.arcarshowcaseserver.service.serviceImpl;
 
+import com.arcarshowcaseserver.dto.UserAccountDTO;
 import com.arcarshowcaseserver.dto.UserPreferencesDTO;
 import com.arcarshowcaseserver.dto.UserProfileDTO;
 import com.arcarshowcaseserver.model.User;
@@ -8,11 +9,14 @@ import com.arcarshowcaseserver.repository.CustomizationRepository;
 import com.arcarshowcaseserver.repository.LikeRepository;
 import com.arcarshowcaseserver.repository.UserRepository;
 import com.arcarshowcaseserver.service.UserService;
+import org.springframework.http.HttpStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashSet;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -24,27 +28,68 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public MessageResponse updateProfile(Long userId, UserPreferencesDTO profileDTO) {
+    public MessageResponse updateProfile(Long userId, UserAccountDTO profileDTO) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Error: User not found."));
 
-        if (profileDTO.getFavBrands() != null) {
-            user.setFavBrands(new HashSet<>(profileDTO.getFavBrands()));
+        String requestedUsername = normalize(profileDTO.getUsername());
+        if (requestedUsername != null && !requestedUsername.isBlank()) {
+            boolean usernameChanged = !requestedUsername.equalsIgnoreCase(user.getUsername());
+            if (Boolean.TRUE.equals(user.getProfileCompleted()) && usernameChanged) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Username cannot be changed after account setup.");
+            }
+
+            if (usernameChanged && userRepository.existsByUsername(requestedUsername)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Username is already taken.");
+            }
+            user.setUsername(requestedUsername);
+            user.setProfileCompleted(true);
         }
-        if (profileDTO.getPreferredBodyTypes() != null) {
-            user.setPreferredBodyTypes(new HashSet<>(profileDTO.getPreferredBodyTypes()));
+
+        if (profileDTO.getDisplayName() != null) {
+            user.setDisplayName(blankToNull(profileDTO.getDisplayName()));
         }
-        if (profileDTO.getPreferredFuelTypes() != null) {
-            user.setPreferredFuelTypes(new HashSet<>(profileDTO.getPreferredFuelTypes()));
+
+        if (profileDTO.getPhoneNumber() != null) {
+            user.setPhoneNumber(blankToNull(profileDTO.getPhoneNumber()));
         }
-        if (profileDTO.getPreferredTransmissions() != null) {
-            user.setPreferredTransmissions(new HashSet<>(profileDTO.getPreferredTransmissions()));
+
+        if (profileDTO.getBio() != null) {
+            user.setBio(blankToNull(profileDTO.getBio()));
         }
-        if (profileDTO.getDrivingCondition() != null) user.setDrivingCondition(profileDTO.getDrivingCondition());
-        if (profileDTO.getMaxBudget() != null) user.setMaxBudget(profileDTO.getMaxBudget());
+
+        if (profileDTO.getProfilePic() != null) {
+            user.setProfilePic(blankToNull(profileDTO.getProfilePic()));
+        }
 
         userRepository.save(user);
         return new MessageResponse("Profile updated successfully");
+    }
+
+    @Override
+    @Transactional
+    public MessageResponse updatePreferences(Long userId, UserPreferencesDTO preferencesDTO) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Error: User not found."));
+
+        if (preferencesDTO.getFavBrands() != null) {
+            user.setFavBrands(new HashSet<>(preferencesDTO.getFavBrands()));
+        }
+        if (preferencesDTO.getPreferredBodyTypes() != null) {
+            user.setPreferredBodyTypes(new HashSet<>(preferencesDTO.getPreferredBodyTypes()));
+        }
+        if (preferencesDTO.getPreferredFuelTypes() != null) {
+            user.setPreferredFuelTypes(new HashSet<>(preferencesDTO.getPreferredFuelTypes()));
+        }
+        if (preferencesDTO.getPreferredTransmissions() != null) {
+            user.setPreferredTransmissions(new HashSet<>(preferencesDTO.getPreferredTransmissions()));
+        }
+        if (preferencesDTO.getDrivingCondition() != null) user.setDrivingCondition(preferencesDTO.getDrivingCondition());
+        if (preferencesDTO.getMaxBudget() != null) user.setMaxBudget(preferencesDTO.getMaxBudget());
+
+        userRepository.save(user);
+        return new MessageResponse("Preferences updated successfully");
     }
 
     @Override
@@ -59,7 +104,11 @@ public class UserServiceImpl implements UserService {
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
+                user.getAuthProvider(),
+                user.getProfileCompleted(),
+                user.getDisplayName(),
                 user.getPhoneNumber(),
+                user.getBio(),
                 user.getProfilePic(),
                 user.getFavBrands(),
                 user.getPreferredBodyTypes(),
@@ -70,5 +119,18 @@ public class UserServiceImpl implements UserService {
                 savedCount,
                 customizedCount
         );
+    }
+
+    private String normalize(String value) {
+        return value == null ? null : value.trim();
+    }
+
+    private String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

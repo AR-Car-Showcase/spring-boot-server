@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,12 +21,14 @@ public class GoogleAuthConfigController {
     @GetMapping("/config")
     public Map<String, Object> config() {
         SecurityProperties.Google google = securityProperties.getGoogle();
+        List<String> clientIds = google.getClientIds();
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("enabled", google.isEnabled());
         body.put("issuerUri", google.getIssuerUri());
         body.put("autoLinkByEmail", google.isAutoLinkByEmail());
-        body.put("clientId", google.getClientId());
+        body.put("clientIds", clientIds);
+        body.put("clientId", clientIds.isEmpty() ? "" : clientIds.get(0));
         return body;
     }
 }

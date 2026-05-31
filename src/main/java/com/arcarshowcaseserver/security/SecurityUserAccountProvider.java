@@ -102,8 +102,13 @@ public class SecurityUserAccountProvider implements UserAccountProvider, Externa
             return toUserAccount(existing);
         }
 
+        boolean hasExternalEmail = profile.email() != null && !profile.email().isBlank();
+        if (hasExternalEmail && !profile.emailVerified()) {
+            throw new IllegalArgumentException("Google email must be verified before account linking.");
+        }
+
         Optional<User> existingByEmail = Optional.empty();
-        if (profile.email() != null && !profile.email().isBlank()) {
+        if (hasExternalEmail) {
             String normalizedEmail = normalizeEmail(profile.email());
             existingByEmail = userRepository.findByEmailIgnoreCase(normalizedEmail)
                     .or(() -> userRepository.findByExternalEmail(normalizedEmail));
@@ -116,11 +121,12 @@ public class SecurityUserAccountProvider implements UserAccountProvider, Externa
             existing.setExternalEmail(normalizeEmail(profile.email()));
             existing.setExternalEmailVerified(profile.emailVerified());
             existing.setEmailVerified(true);
+            existing.setProfileCompleted(true);
             return toUserAccount(userRepository.save(existing));
         }
 
         User created = new User();
-        created.setUsername(generateGoogleUsername(profile.subject()));
+        created.setUsername(generateGoogleUsername(profile));
         created.setEmail(resolveEmail(profile));
         created.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
         created.setAuthProvider("GOOGLE");
@@ -128,6 +134,7 @@ public class SecurityUserAccountProvider implements UserAccountProvider, Externa
         created.setExternalEmail(profile.email());
         created.setExternalEmailVerified(profile.emailVerified());
         created.setEmailVerified(true);
+        created.setProfileCompleted(false);
 
         Role defaultRole = roleRepository.findByName(RoleType.DEFAULT)
                 .orElseThrow(() -> new IllegalStateException("DEFAULT role not found"));
@@ -192,14 +199,46 @@ public class SecurityUserAccountProvider implements UserAccountProvider, Externa
             return normalizeEmail(profile.email());
         }
 
-        return generateGoogleUsername(profile.subject()) + "@google.local";
+        return generateGoogleUsername(profile) + "@google.local";
     }
 
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase();
     }
 
-    private String generateGoogleUsername(String subject) {
+    private String generateGoogleUsername(ExternalIdentityProfile profile) {
+        String preferred = null;
+
+        if (profile.email() != null && !profile.email().isBlank() && profile.email().contains("@")) {
+            preferred = profile.email().substring(0, profile.email().indexOf('@'));
+        } else if (profile.displayName() != null && !profile.displayName().isBlank()) {
+            preferred = profile.displayName();
+        }
+
+        if (preferred != null) {
+            String sanitized = preferred.toLowerCase()
+                    .replaceAll("[^a-z0-9._]", "_")
+                    .replaceAll("_+", "_")
+                    .replaceAll("^[._]+|[._]+$", "");
+
+            if (!sanitized.isBlank()) {
+                String base = sanitized.length() > 20 ? sanitized.substring(0, 20) : sanitized;
+                String candidate = base;
+                int suffix = 1;
+                while (userRepository.existsByUsername(candidate)) {
+                    String tail = "_" + suffix++;
+                    int maxPrefixLength = Math.max(1, 20 - tail.length());
+                    String prefix = base.length() > maxPrefixLength ? base.substring(0, maxPrefixLength) : base;
+                    candidate = prefix + tail;
+                }
+                return candidate;
+            }
+        }
+
+        return fallbackGoogleUsername(profile.subject());
+    }
+
+    private String fallbackGoogleUsername(String subject) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(subject.getBytes(StandardCharsets.UTF_8));

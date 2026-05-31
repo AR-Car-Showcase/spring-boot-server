@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "security.jwt.expiration-ms=3600000",
         "security.jwt.refresh-expiration-ms=604800000",
         "security.jwt.issuer=ar-car-showcase-server-test",
-        "security.public-endpoints=/api/auth/signup,/api/auth/verify-email,/api/auth/resend-verification",
+        "security.public-endpoints=/api/auth/signup,/api/auth/verify-email,/api/auth/resend-verification,/api/auth/forgot-password,/api/auth/resend-password-reset,/api/auth/reset-password,/api/auth/google/config,/api/models/**,/api/static/models/**",
         "app.signup.verification.smtp-enabled=false",
         "app.signup.verification.store-mode=INMEMORY",
         "app.cors.allowed-origins=http://localhost:8081",
@@ -137,15 +137,6 @@ class SecurityFlowIntegrationTest {
         String verificationCode = otpCaptor.getValue();
         assertThat(verificationCode).isNotBlank();
 
-        mockMvc.perform(post("/api/auth/resend-verification")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "email": "security_user@example.com"
-                                }
-                                """))
-                .andExpect(status().isTooManyRequests());
-
         mockMvc.perform(post("/api/auth/verify-email")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -193,7 +184,7 @@ class SecurityFlowIntegrationTest {
         assertThat(profileJson.get("savedCount").asLong()).isZero();
         assertThat(profileJson.get("customizedCount").asLong()).isZero();
 
-        mockMvc.perform(put("/api/user/profile")
+        mockMvc.perform(put("/api/user/preferences")
                         .header("Authorization", "Bearer " + accessToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -286,20 +277,6 @@ class SecurityFlowIntegrationTest {
                                 """.formatted(seededCarId)))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/customizations")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "vehicleId": "%s",
-                                  "materials": {
-                                    "seat": "alcantara",
-                                    "body": "chrome"
-                                  }
-                                }
-                                """.formatted(seededCarId)))
-                .andExpect(status().isTooManyRequests());
-
         JsonNode refreshed = objectMapper.readTree(
                 mockMvc.perform(post("/refresh")
                                 .contentType(MediaType.APPLICATION_JSON)
@@ -338,6 +315,17 @@ class SecurityFlowIntegrationTest {
                                 }
                                 """.formatted(refreshedRefreshToken)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void modelDownloadsAreRateLimited() throws Exception {
+        for (int i = 0; i < 8; i++) {
+            mockMvc.perform(get("/api/static/models/car.glb"))
+                    .andExpect(status().isOk());
+        }
+
+        mockMvc.perform(get("/api/static/models/car.glb"))
+                .andExpect(status().isTooManyRequests());
     }
 
     @Test

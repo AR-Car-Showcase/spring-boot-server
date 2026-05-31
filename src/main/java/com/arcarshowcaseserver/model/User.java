@@ -58,8 +58,17 @@ public class User {
     @Column(name = "external_email_verified")
     private Boolean externalEmailVerified = false;
 
+    @Column(name = "profile_completed", nullable = false)
+    private Boolean profileCompleted = true;
+
     @Size(max = 20)
     private String phoneNumber;
+
+    @Size(max = 60)
+    private String displayName;
+
+    @Column(columnDefinition = "TEXT")
+    private String bio;
 
     @Column(columnDefinition = "TEXT")
     private String profilePic;
@@ -141,6 +150,9 @@ public class User {
         }
         if (externalEmailVerified == null) {
             externalEmailVerified = false;
+        }
+        if (profileCompleted == null) {
+            profileCompleted = true;
         }
     }
 }

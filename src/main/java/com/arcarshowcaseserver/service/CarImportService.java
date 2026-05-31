@@ -22,13 +22,16 @@ public class CarImportService {
     private final CarRepository carRepository;
     private final ObjectMapper objectMapper;
     private final com.arcarshowcaseserver.configuration.CarModelConfig carModelConfig;
+    private final com.arcarshowcaseserver.configuration.ModelAssetProperties modelAssetProperties;
 
     public CarImportService(CarRepository carRepository,
                             ObjectMapper objectMapper,
-                            com.arcarshowcaseserver.configuration.CarModelConfig carModelConfig) {
+                            com.arcarshowcaseserver.configuration.CarModelConfig carModelConfig,
+                            com.arcarshowcaseserver.configuration.ModelAssetProperties modelAssetProperties) {
         this.carRepository = carRepository;
         this.objectMapper = objectMapper;
         this.carModelConfig = carModelConfig;
+        this.modelAssetProperties = modelAssetProperties;
     }
 
     @Transactional
@@ -67,7 +70,7 @@ public class CarImportService {
         car.setRating(node.path("rating").asDouble(0.0));
 
         String assignedModel = resolveModelFile(car.getBrand(), car.getModel());
-        car.setModelUrl("/api/static/models/" + assignedModel);
+        car.setModelUrl(modelAssetProperties.buildStaticModelUrl(assignedModel));
 
         mapSpecs(node, car);
 

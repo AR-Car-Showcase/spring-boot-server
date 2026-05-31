@@ -1,5 +1,6 @@
 package com.arcarshowcaseserver.service;
 
+import com.arcarshowcaseserver.configuration.ModelAssetProperties;
 import com.arcarshowcaseserver.model.Cars.CarImage;
 import com.arcarshowcaseserver.model.Customization;
 import com.arcarshowcaseserver.model.User;
@@ -40,6 +41,7 @@ public class CustomizationService {
     private final UserRepository userRepository;
     private final RestTemplate restTemplate;
     private final CurrentAuthenticatedUserService currentAuthenticatedUserService;
+    private final ModelAssetProperties modelAssetProperties;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${blender.service.url}")
@@ -100,7 +102,7 @@ public class CustomizationService {
 
         String modelFilename = (String) response.getBody().get("model_url");
 
-        String fullModelUrl = "/api/models/" + modelFilename;
+        String fullModelUrl = modelAssetProperties.buildGeneratedModelUrl(modelFilename);
         customization.setModelUrl(fullModelUrl);
         customizationRepository.save(customization);
 

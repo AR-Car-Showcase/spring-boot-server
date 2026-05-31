@@ -32,7 +32,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        if (!properties.isEnabled() || isStaticAsset(request.getRequestURI())) {
+        if (!properties.isEnabled()) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -68,32 +68,15 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private boolean isStaticAsset(String uri) {
-        return uri.startsWith("/api/models/")
-                || uri.startsWith("/api/static/")
-                || uri.startsWith("/favicon")
+        return uri.startsWith("/favicon")
                 || uri.startsWith("/_expo")
                 || uri.startsWith("/assets");
     }
 
     private RateLimitRule resolveRule(String uri) {
-        if (uri.equals("/login")
-                || uri.equals("/login/google")
-                || uri.equals("/refresh")
-                || uri.equals("/logout")
-                || uri.equals("/api/auth/signup")
-                || uri.equals("/api/auth/verify-email")
-                || uri.equals("/api/auth/resend-verification")) {
-            return RateLimitRule.AUTH;
-        }
-
-        if (uri.startsWith("/api/customizations")
-                || uri.startsWith("/api/cars/ai/")
-                || uri.startsWith("/api/cars/recommendations/feedback")) {
-            return RateLimitRule.EXPENSIVE;
-        }
-
-        if (uri.startsWith("/api/")) {
-            return RateLimitRule.GENERAL;
+        if (uri.startsWith("/api/static/models/")
+                || uri.startsWith("/api/models/")) {
+            return RateLimitRule.MODEL_DOWNLOAD;
         }
 
         return null;
@@ -114,52 +97,20 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     }
 
     private enum RateLimitRule {
-        AUTH {
+        MODEL_DOWNLOAD {
             @Override
             int capacity(RateLimitProperties properties) {
-                return properties.getAuthCapacity();
+                return properties.getModelCapacity();
             }
 
             @Override
             int refillPerMinute(RateLimitProperties properties) {
-                return properties.getAuthRefillPerMinute();
+                return properties.getModelRefillPerMinute();
             }
 
             @Override
             String message() {
-                return "Too many authentication requests. Please slow down and try again.";
-            }
-        },
-        EXPENSIVE {
-            @Override
-            int capacity(RateLimitProperties properties) {
-                return properties.getExpensiveCapacity();
-            }
-
-            @Override
-            int refillPerMinute(RateLimitProperties properties) {
-                return properties.getExpensiveRefillPerMinute();
-            }
-
-            @Override
-            String message() {
-                return "Too many expensive requests. Please slow down and try again.";
-            }
-        },
-        GENERAL {
-            @Override
-            int capacity(RateLimitProperties properties) {
-                return properties.getGeneralCapacity();
-            }
-
-            @Override
-            int refillPerMinute(RateLimitProperties properties) {
-                return properties.getGeneralRefillPerMinute();
-            }
-
-            @Override
-            String message() {
-                return "Too many requests. Please slow down and try again.";
+                return "Too many model downloads. Please slow down and try again.";
             }
         };
 

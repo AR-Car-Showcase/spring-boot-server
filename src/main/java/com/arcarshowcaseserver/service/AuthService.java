@@ -50,12 +50,13 @@ public class AuthService {
 
         if (userRepository.existsByEmailIgnoreCase(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "A verification flow already exists for this email. Please use the verification screen or resend the code.");
+                    "An account with this email already exists. Please sign in or reset your password.");
         }
 
         User user = new User(username, email, encoder.encode(signUpRequest.getPassword()));
         user.setAuthProvider("LOCAL");
         user.setEmailVerified(false);
+        user.setProfileCompleted(true);
         user.setPhoneNumber(signUpRequest.getPhoneNumber());
         user.setProfilePic(signUpRequest.getProfilePic());
 

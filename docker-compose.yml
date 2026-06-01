@@ -23,18 +23,6 @@ services:
       timeout: 5s
       retries: 5
 
-  blender:
-    build: ../blender-service
-    env_file:
-      - ../blender-service/.env
-    environment:
-      - GENERATED_DIR=/shared/generated
-    volumes:
-      - ${OCI_CONFIG_DIR:-/tmp/oci-empty}:/root/.oci:ro
-      - blender_generated:/shared/generated
-    ports:
-      - "5000:5000"
-
   recommendation:
     build: ../recommendation-service
     environment:
@@ -52,8 +40,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      blender:
-        condition: service_started
       recommendation:
         condition: service_started
     environment:
@@ -62,7 +48,7 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
-      BLENDER_SERVICE_URL: http://blender:5000
+      BLENDER_SERVICE_URL: ${BLENDER_SERVICE_URL}
       ML_SERVICE_URL: http://recommendation:8000
       ML_SERVICE_KEY: ${ML_SERVICE_KEY:-carshowcase_internal_2026}
       GROQ_API_KEY: ${GROQ_API_KEY}
@@ -70,8 +56,6 @@ services:
       - "8080:8080"
     volumes:
       - ./src/main/resources/static/models:/app/src/main/resources/static/models
-      - blender_generated:/shared/generated
 
 volumes:
   postgres_data:
-  blender_generated:

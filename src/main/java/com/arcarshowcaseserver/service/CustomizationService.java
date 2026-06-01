@@ -51,11 +51,22 @@ public class CustomizationService {
     public CustomizationResponse createCustomization(CustomizationRequest request) {
         User user = getCurrentUser();
 
+        Map<String, String> requestedMaterials = request.getMaterials() == null
+                ? Map.of()
+                : request.getMaterials();
+        if (requestedMaterials.isEmpty()) {
+            log.warn("[CustomizationService] Customization requested with empty material map; generated model will match base model.");
+        }
+        log.info("[CustomizationService] Incoming customization request: vehicleId={}, materialCount={}, materialKeys={}",
+                request.getVehicleId(),
+                requestedMaterials.size(),
+                requestedMaterials.keySet());
+
         Customization customization = new Customization();
         customization.setUser(user);
         customization.setVehicleId(request.getVehicleId());
         try {
-            customization.setMaterials(objectMapper.writeValueAsString(request.getMaterials()));
+            customization.setMaterials(objectMapper.writeValueAsString(requestedMaterials));
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Error converting materials to JSON", e);
         }
@@ -81,7 +92,7 @@ public class CustomizationService {
         
         Map<String, Object> pythonRequest = new HashMap<>();
         pythonRequest.put("base_model", baseModelUrl); 
-        pythonRequest.put("materials", request.getMaterials());
+        pythonRequest.put("materials", requestedMaterials);
         pythonRequest.put("output_name", "car_" + customization.getId().toString());
 
         HttpHeaders headers = new HttpHeaders();

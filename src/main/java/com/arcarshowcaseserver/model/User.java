@@ -36,7 +36,7 @@ public class User {
     @Email
     private String email;
 
-    @Column(name = "email_verified", nullable = false)
+    @Column(name = "email_verified", nullable = false, columnDefinition = "boolean default false")
     private Boolean emailVerified = false;
 
     @NotBlank
@@ -55,10 +55,10 @@ public class User {
     @Column(name = "external_email", length = 50)
     private String externalEmail;
 
-    @Column(name = "external_email_verified")
+    @Column(name = "external_email_verified", columnDefinition = "boolean default false")
     private Boolean externalEmailVerified = false;
 
-    @Column(name = "profile_completed", nullable = false)
+    @Column(name = "profile_completed", nullable = false, columnDefinition = "boolean default true")
     private Boolean profileCompleted = true;
 
     @Size(max = 20)

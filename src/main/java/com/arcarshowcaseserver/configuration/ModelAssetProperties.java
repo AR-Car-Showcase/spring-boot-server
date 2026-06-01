@@ -21,13 +21,19 @@ public class ModelAssetProperties {
     private String generatedVersion;
 
     public String buildStaticModelUrl(String filename) {
+        if (isAbsoluteUrl(filename)) {
+            return appendVersion(filename, staticVersion);
+        }
         String base = normalizeBaseUrl(staticBaseUrl, "/api/static/models");
-        return appendVersion(base + "/" + filename, staticVersion);
+        return appendVersion(joinBaseAndFilename(base, filename), staticVersion);
     }
 
     public String buildGeneratedModelUrl(String filename) {
+        if (isAbsoluteUrl(filename)) {
+            return appendVersion(filename, generatedVersion);
+        }
         String base = normalizeBaseUrl(generatedBaseUrl, "/api/models");
-        return appendVersion(base + "/" + filename, generatedVersion);
+        return appendVersion(joinBaseAndFilename(base, filename), generatedVersion);
     }
 
     private String normalizeBaseUrl(String value, String fallback) {
@@ -41,11 +47,27 @@ public class ModelAssetProperties {
         return base;
     }
 
+    private String joinBaseAndFilename(String base, String filename) {
+        if (base.endsWith("%2F")) {
+            return base + filename;
+        }
+
+        return base + "/" + filename;
+    }
+
     private String appendVersion(String url, String version) {
         if (version == null || version.isBlank()) {
             return url;
         }
         String separator = url.contains("?") ? "&" : "?";
         return url + separator + "v=" + version.trim();
+    }
+
+    private boolean isAbsoluteUrl(String value) {
+        if (value == null) {
+            return false;
+        }
+        String normalized = value.trim().toLowerCase();
+        return normalized.startsWith("http://") || normalized.startsWith("https://");
     }
 }

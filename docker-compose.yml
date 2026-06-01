@@ -13,15 +13,24 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   blender:
     build: ../blender-service
+    env_file:
+      - ../blender-service/.env
     environment:
-      - FLASK_ENV=production
-      - BASE_MODELS_DIR=/app/src/main/resources/static/models
-      - CAR_MODEL_NAME=car.glb
       - GENERATED_DIR=/shared/generated
     volumes:
-      - ./src/main/resources/static/models:/app/src/main/resources/static/models
+      - ${OCI_CONFIG_DIR:-/tmp/oci-empty}:/root/.oci:ro
       - blender_generated:/shared/generated
     ports:
       - "5000:5000"
@@ -37,8 +46,11 @@ services:
 
   app:
     build: .
+    env_file: .env
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       blender:
         condition: service_started
@@ -47,6 +59,7 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-car_data}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATA_REDIS_HOST: redis
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       BLENDER_SERVICE_URL: http://blender:5000

@@ -106,16 +106,22 @@ public class CustomizationService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to connect to Blender service at " + generateUrl + ": " + e.getMessage(), e);
         }
+        log.info("[CustomizationService] Blender response received: status={}, body={}",
+                response.getStatusCode(),
+                response.getBody());
         
         if (response.getBody() == null || !response.getBody().containsKey("model_url")) {
             throw new RuntimeException("Invalid response from Blender service: " + response.getBody());
         }
 
         String modelFilename = (String) response.getBody().get("model_url");
+        log.info("[CustomizationService] Blender returned model_url={}", modelFilename);
 
         String fullModelUrl = modelAssetProperties.buildGeneratedModelUrl(modelFilename);
+        log.info("[CustomizationService] Final generated model URL={}", fullModelUrl);
         customization.setModelUrl(fullModelUrl);
         customizationRepository.save(customization);
+        log.info("[CustomizationService] Customization saved successfully with id={}", customization.getId());
 
         String image = car.getImages().stream()
                 .filter(img -> "Exterior".equalsIgnoreCase(img.getType()))

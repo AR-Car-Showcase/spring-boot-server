@@ -382,7 +382,7 @@ AR-Car-Showcase-Server/
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/AdepuSriCharan/AR-Car-Showcase-Server.git
+   git clone https://github.com/AR-Car-Showcase/spring-boot-server.git
    cd AR-Car-Showcase-Server
    ```
 
@@ -522,6 +522,15 @@ Spring Boot → POST /generate → Flask Server → subprocess(blender --backgro
 - [Spring Security Reference](https://docs.spring.io/spring-security/reference/)
 - [Blender Python API](https://docs.blender.org/api/current/)
 - [ViroReact Documentation](https://viro-community.readme.io/)
+
+---
+
+## 🔗 Related Repositories
+
+- **[Mobile App](https://github.com/AR-Car-Showcase/mobile-app)** – React Native application with AR and 3D visualization
+- **[Spring Boot Server](https://github.com/AR-Car-Showcase/spring-boot-server)** – Core backend APIs and business logic
+- **[Blender Service](https://github.com/AR-Car-Showcase/blender-service)** – Automated 3D model generation pipeline
+- **[Recommendation Service](https://github.com/AR-Car-Showcase/recommendation-service)** – AI-powered vehicle recommendation engine
 
 ---
 

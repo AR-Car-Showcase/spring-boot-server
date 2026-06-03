@@ -1,6 +1,7 @@
 package com.arcarshowcaseserver.security;
 
 import com.arcarshowcaseserver.enums.RoleType;
+import com.arcarshowcaseserver.exception.AccountNotVerifiedException;
 import com.arcarshowcaseserver.model.Role;
 import com.arcarshowcaseserver.model.User;
 import com.arcarshowcaseserver.repository.RoleRepository;
@@ -45,11 +46,22 @@ public class SecurityUserAccountProvider implements UserAccountProvider, Externa
         }
 
         String candidate = username.trim();
-        return userRepository.findByUsername(candidate)
+        Optional<User> userOpt = userRepository.findByUsername(candidate)
                 .or(() -> userRepository.findByEmailIgnoreCase(candidate))
-                .or(() -> userRepository.findByEmail(candidate))
-                .filter(this::isLoginEligible)
-                .map(this::toUserAccount);
+                .or(() -> userRepository.findByEmail(candidate));
+        
+        if (userOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        
+        User user = userOpt.get();
+        
+        // Check if user is unverified LOCAL account
+        if ("LOCAL".equalsIgnoreCase(user.getAuthProvider()) && !Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new AccountNotVerifiedException(user.getEmail());
+        }
+        
+        return Optional.of(toUserAccount(user));
     }
 
     @Override

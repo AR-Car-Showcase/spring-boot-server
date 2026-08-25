@@ -47,6 +47,9 @@ public class CustomizationService {
     @Value("${blender.service.url}")
     private String blenderServiceUrl;
 
+    @Value("${blender.service.token:}")
+    private String blenderServiceToken;
+
     @Transactional
     public CustomizationResponse createCustomization(CustomizationRequest request) {
         User user = getCurrentUser();
@@ -95,8 +98,14 @@ public class CustomizationService {
         pythonRequest.put("materials", requestedMaterials);
         pythonRequest.put("output_name", "car_" + customization.getId().toString());
 
+        if (blenderServiceToken == null || blenderServiceToken.isBlank()) {
+            log.error("[CustomizationService] blender.service.token is not configured; refusing to call the Blender service.");
+            throw new IllegalStateException("Blender service credentials are not configured.");
+        }
+
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("X-Blender-Token", blenderServiceToken);
         HttpEntity<Map<String, Object>> entity = new HttpEntity<>(pythonRequest, headers);
 
         log.info("[CustomizationService] Requesting generation from: {}", generateUrl);
@@ -104,7 +113,8 @@ public class CustomizationService {
         try {
             response = restTemplate.postForEntity(generateUrl, entity, Map.class);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to connect to Blender service at " + generateUrl + ": " + e.getMessage(), e);
+            log.error("[CustomizationService] Blender call to {} failed", generateUrl, e);
+            throw new RuntimeException("Model generation is temporarily unavailable.", e);
         }
         log.info("[CustomizationService] Blender response received: status={}, body={}",
                 response.getStatusCode(),

@@ -85,6 +85,9 @@ class SecurityFlowIntegrationTest {
     @MockBean
     private EmailVerificationSender emailVerificationSender;
 
+    @MockBean
+    private com.arcarshowcaseserver.service.passwordreset.PasswordResetSender passwordResetSender;
+
     private Long seededCarId;
 
     @BeforeEach
@@ -340,5 +343,124 @@ class SecurityFlowIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    /**
+     * A password change exists to evict whoever else holds the credentials. Before this
+     * was fixed, refresh tokens issued before the change stayed valid for their full
+     * 7-day lifetime, so "reset your password" did not actually end the attacker's session.
+     */
+    @Test
+    void changingPasswordRevokesExistingRefreshTokens() throws Exception {
+        String refreshToken = registerVerifiedUserAndLogin("revoke_user", "Pass@1234").get("refreshToken").asText();
+
+        // The refresh token works before the password changes.
+        mockMvc.perform(post("/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\": \"%s\"}".formatted(refreshToken)))
+                .andExpect(status().isOk());
+
+        // Re-login because the successful refresh above rotated the token.
+        JsonNode session = login("revoke_user", "Pass@1234");
+        String liveRefreshToken = session.get("refreshToken").asText();
+        String liveAccessToken = session.get("accessToken").asText();
+
+        mockMvc.perform(post("/api/auth/change-password")
+                        .header("Authorization", "Bearer " + liveAccessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "currentPassword": "Pass@1234",
+                                  "newPassword": "NewPass@5678"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        // The session that existed before the change must no longer be refreshable.
+        mockMvc.perform(post("/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\": \"%s\"}".formatted(liveRefreshToken)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Same guarantee via the unauthenticated reset-by-OTP path, which is the one an
+     * account-recovery flow actually uses.
+     */
+    @Test
+    void resettingPasswordByOtpRevokesExistingRefreshTokens() throws Exception {
+        String refreshToken = registerVerifiedUserAndLogin("reset_user", "Pass@1234").get("refreshToken").asText();
+
+        var resetCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\": \"reset_user@example.com\"}"))
+                .andExpect(status().isOk());
+
+        verify(passwordResetSender).sendResetCode(
+                eq("reset_user@example.com"), eq("reset_user"), resetCaptor.capture(), any(Duration.class));
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "reset_user@example.com",
+                                  "code": "%s",
+                                  "newPassword": "NewPass@5678"
+                                }
+                                """.formatted(resetCaptor.getValue())))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\": \"%s\"}".formatted(refreshToken)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private JsonNode registerVerifiedUserAndLogin(String username, String password) throws Exception {
+        var otpCaptor = org.mockito.ArgumentCaptor.forClass(String.class);
+
+        mockMvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "%s",
+                                  "email": "%s@example.com",
+                                  "password": "%s"
+                                }
+                                """.formatted(username, username, password)))
+                .andExpect(status().isOk());
+
+        verify(emailVerificationSender).sendVerificationCode(
+                eq(username + "@example.com"), eq(username), otpCaptor.capture(), any(Duration.class));
+
+        mockMvc.perform(post("/api/auth/verify-email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s@example.com",
+                                  "code": "%s"
+                                }
+                                """.formatted(username, otpCaptor.getValue())))
+                .andExpect(status().isOk());
+
+        return login(username, password);
+    }
+
+    private JsonNode login(String username, String password) throws Exception {
+        return objectMapper.readTree(
+                mockMvc.perform(post("/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                          "username": "%s",
+                                          "password": "%s"
+                                        }
+                                        """.formatted(username, password)))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString()
+        );
     }
 }

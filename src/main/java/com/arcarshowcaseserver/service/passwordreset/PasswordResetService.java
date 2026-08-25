@@ -8,7 +8,10 @@ import com.arcarshowcaseserver.payload.request.ResetPasswordRequest;
 import com.arcarshowcaseserver.payload.response.MessageResponse;
 import com.arcarshowcaseserver.payload.response.PasswordResetResponse;
 import com.arcarshowcaseserver.repository.UserRepository;
+import com.sricharan.security.core.token.RefreshTokenStore;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,9 +27,11 @@ import java.util.Locale;
 @RequiredArgsConstructor
 public class PasswordResetService {
 
+    private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
+    private final RefreshTokenStore refreshTokenStore;
     private final PasswordResetChallengeStore challengeStore;
     private final PasswordResetSender resetSender;
     private final PasswordResetSecurityProperties properties;
@@ -169,6 +174,27 @@ public class PasswordResetService {
     private void applyNewPassword(User user, String newPassword) {
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+        revokeAllSessions(user);
+    }
+
+    /**
+     * Invalidates every refresh token issued to this account.
+     *
+     * <p>A password change exists to evict whoever else holds the credentials, so leaving
+     * previously issued refresh tokens alive (7 days by default) would defeat the point.
+     * The password change itself is never rolled back if revocation fails - the user asked
+     * for the change and the old password must not survive - but the failure is logged at
+     * ERROR because it leaves live sessions behind and needs manual follow-up.
+     */
+    private void revokeAllSessions(User user) {
+        String userId = String.valueOf(user.getId());
+        try {
+            refreshTokenStore.revokeAllForUser(userId);
+            log.info("Revoked all refresh tokens for user {} after password change.", userId);
+        } catch (Exception ex) {
+            log.error("Password changed for user {} but refresh-token revocation FAILED. "
+                    + "Existing sessions remain valid and must be revoked manually.", userId, ex);
+        }
     }
 
     private User findPasswordManagedUser(String email) {

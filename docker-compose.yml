@@ -15,10 +15,18 @@ services:
 
   redis:
     image: redis:7.4-alpine
+    environment:
+      REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD:?SPRING_DATA_REDIS_PASSWORD must be set}
+    # Redis holds refresh tokens and signup/reset OTP challenges, so it needs a password
+    # and it needs to survive a restart.
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
     ports:
-      - "6379:6379"
+      # Loopback only. Reached by the app as redis:6379 over the compose network.
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,7 +36,8 @@ services:
     environment:
       - APP_ENV=production
     ports:
-      - "8000:8000"
+      # Loopback only. Reached by the app as http://recommendation:8000.
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./src/main/resources/cars_data_final.json:/app/dataset/cars_data_final.json
 
@@ -46,6 +55,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-car_data}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PASSWORD: ${SPRING_DATA_REDIS_PASSWORD:?SPRING_DATA_REDIS_PASSWORD must be set}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       BLENDER_SERVICE_URL: ${BLENDER_SERVICE_URL}
@@ -53,9 +63,11 @@ services:
       ML_SERVICE_KEY: ${ML_SERVICE_KEY:-carshowcase_internal_2026}
       GROQ_API_KEY: ${GROQ_API_KEY}
     ports:
-      - "8080:8080"
+      # Loopback only so traffic has to arrive through nginx/Cloudflare.
+      - "127.0.0.1:8080:8080"
     volumes:
       - ./src/main/resources/static/models:/app/src/main/resources/static/models
 
 volumes:
   postgres_data:
+  redis_data:

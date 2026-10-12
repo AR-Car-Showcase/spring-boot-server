@@ -463,4 +463,58 @@ class SecurityFlowIntegrationTest {
                         .getContentAsString()
         );
     }
+
+    /**
+     * Saved customizations must be deletable by their owner, and only by their owner.
+     * A row belonging to someone else answers 404, not 403 - a 403 would confirm the id
+     * exists and turn the endpoint into an enumeration oracle over other users' data.
+     */
+    @Test
+    void customizationsCanBeDeletedByTheirOwnerOnly() throws Exception {
+        JsonNode ownerSession = registerVerifiedUserAndLogin("owner_user", "Pass@1234");
+        String ownerToken = ownerSession.get("accessToken").asText();
+
+        JsonNode created = objectMapper.readTree(
+                mockMvc.perform(post("/api/customizations")
+                                .header("Authorization", "Bearer " + ownerToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                          "vehicleId": "%s",
+                                          "materials": { "CAR_BODY_PRIMARY": "#FF0000" }
+                                        }
+                                        """.formatted(seededCarId)))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString()
+        );
+        String customizationId = created.get("customizationId").asText();
+
+        // Anonymous callers cannot delete.
+        mockMvc.perform(delete("/api/customizations/" + customizationId))
+                .andExpect(status().isUnauthorized());
+
+        // A different signed-in user cannot delete it, and cannot tell it exists.
+        String otherToken = registerVerifiedUserAndLogin("other_user", "Pass@1234")
+                .get("accessToken").asText();
+        mockMvc.perform(delete("/api/customizations/" + customizationId)
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isNotFound());
+
+        // It is still there for the owner.
+        assertThat(customizationRepository.count()).isEqualTo(1);
+
+        // The owner can delete it.
+        mockMvc.perform(delete("/api/customizations/" + customizationId)
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isNoContent());
+
+        assertThat(customizationRepository.count()).isZero();
+
+        // Deleting again is a 404, not a 500.
+        mockMvc.perform(delete("/api/customizations/" + customizationId)
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isNotFound());
+    }
 }

@@ -1,6 +1,7 @@
 package com.arcarshowcaseserver.service;
 
 import com.arcarshowcaseserver.configuration.ModelAssetProperties;
+import com.arcarshowcaseserver.exceptions.ResourceNotFoundException;
 import com.arcarshowcaseserver.model.Cars.CarImage;
 import com.arcarshowcaseserver.model.Customization;
 import com.arcarshowcaseserver.model.User;
@@ -29,6 +30,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -175,6 +177,25 @@ public class CustomizationService {
                     return new CustomizationResponse(c.getId(), c.getModelUrl(), brand, model, image, c.getVehicleId(), c.getMaterials());
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Removes one of the caller's saved customizations.
+     *
+     * <p>Answers 404 rather than 403 for a row owned by somebody else: a 403 would
+     * confirm that the id exists, which is an enumeration oracle over other users' data.
+     *
+     * <p>The generated GLB stays in object storage - bucket lifecycle and orphan
+     * reconciliation are handled separately.
+     */
+    @Transactional
+    public void deleteCustomization(UUID customizationId) {
+        User user = getCurrentUser();
+        Customization customization = customizationRepository.findByIdAndUser(customizationId, user)
+                .orElseThrow(() -> new ResourceNotFoundException("Customization not found."));
+
+        customizationRepository.delete(customization);
+        log.info("[CustomizationService] Deleted customization {} for user {}", customizationId, user.getId());
     }
 
     private User getCurrentUser() {

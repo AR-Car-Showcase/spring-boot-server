@@ -5,7 +5,10 @@ import com.arcarshowcaseserver.model.RecommendationHistory;
 import com.arcarshowcaseserver.repository.CarRepository;
 import com.arcarshowcaseserver.repository.RecommendationHistoryRepository;
 import com.arcarshowcaseserver.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -13,6 +16,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
@@ -25,6 +30,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class RecommendationService {
+
+    private static final Logger log = LoggerFactory.getLogger(RecommendationService.class);
 
     @Autowired
     private CarRepository carRepository;
@@ -41,7 +48,14 @@ public class RecommendationService {
     @Value("${ml.service.key}")
     private String mlServiceKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    /**
+     * Deliberately the short-fused client, not the primary one: a {@code new RestTemplate()}
+     * has no connect or read timeout at all, so a wedged ML service used to pin a Tomcat
+     * worker thread forever and could take the whole API down with it.
+     */
+    @Autowired
+    @Qualifier("mlServiceRestTemplate")
+    private RestTemplate restTemplate;
 
     private String toBrandModelKey(Car car) {
         return (car.getBrand() + "_" + car.getModel()).toLowerCase();
@@ -85,7 +99,16 @@ public class RecommendationService {
 
             return recommendedCars;
 
+        } catch (ResourceAccessException e) {
+            log.warn("[RecommendationService] ML service unreachable or too slow for similar cars (carId={}): {}",
+                    carId, e.getMessage());
+            return new ArrayList<>();
+        } catch (RestClientException e) {
+            log.warn("[RecommendationService] ML service returned an unusable response for similar cars (carId={}): {}",
+                    carId, e.getMessage());
+            return new ArrayList<>();
         } catch (Exception e) {
+            log.error("[RecommendationService] Unexpected failure building similar cars (carId={})", carId, e);
             return new ArrayList<>();
         }
     }
@@ -96,10 +119,13 @@ public class RecommendationService {
             return new ArrayList<>();
         }
 
-        List<String> brands = new ArrayList<>(user.getFavBrands() != null ? user.getFavBrands() : new ArrayList<>());
-        List<String> bodyTypes = new ArrayList<>(user.getPreferredBodyTypes() != null ? user.getPreferredBodyTypes() : new ArrayList<>());
-        List<String> fuelTypes = new ArrayList<>(user.getPreferredFuelTypes() != null ? user.getPreferredFuelTypes() : new ArrayList<>());
-        List<String> transmissions = new ArrayList<>(user.getPreferredTransmissions() != null ? user.getPreferredTransmissions() : new ArrayList<>());
+        // Fetched as projections rather than off the entity: the preference sets are
+        // lazy, and touching them here only worked while open-session-in-view kept a
+        // session open for the HTTP request.
+        List<String> brands = new ArrayList<>(userRepository.findFavBrands(userId));
+        List<String> bodyTypes = new ArrayList<>(userRepository.findPreferredBodyTypes(userId));
+        List<String> fuelTypes = new ArrayList<>(userRepository.findPreferredFuelTypes(userId));
+        List<String> transmissions = new ArrayList<>(userRepository.findPreferredTransmissions(userId));
 
         brands.replaceAll(String::toLowerCase);
         bodyTypes.replaceAll(String::toLowerCase);
@@ -159,7 +185,16 @@ public class RecommendationService {
 
             return recommendedCars;
 
+        } catch (ResourceAccessException e) {
+            log.warn("[RecommendationService] ML service unreachable or too slow for personalized recommendations (userId={}): {}",
+                    userId, e.getMessage());
+            return new ArrayList<>();
+        } catch (RestClientException e) {
+            log.warn("[RecommendationService] ML service returned an unusable response for personalized recommendations (userId={}): {}",
+                    userId, e.getMessage());
+            return new ArrayList<>();
         } catch (Exception e) {
+            log.error("[RecommendationService] Unexpected failure building personalized recommendations (userId={})", userId, e);
             return new ArrayList<>();
         }
     }
@@ -188,7 +223,11 @@ public class RecommendationService {
 
         try {
             restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            // The interaction is already stored locally; only the online learning
+            // signal is lost, so the user's request still succeeds.
+            log.warn("[RecommendationService] Failed to relay feedback to ML service (car={}, action={}): {}",
+                    carKey, action, e.getMessage());
         }
     }
 }

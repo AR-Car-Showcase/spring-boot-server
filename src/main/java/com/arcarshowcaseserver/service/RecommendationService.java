@@ -57,11 +57,27 @@ public class RecommendationService {
     @Qualifier("mlServiceRestTemplate")
     private RestTemplate restTemplate;
 
+    /**
+     * Without the shared secret the ML service answers 403 to everything, so there is
+     * no point spending a request and a thread to find that out on every call.
+     */
+    private boolean mlServiceUnconfigured() {
+        if (mlServiceKey == null || mlServiceKey.isBlank()) {
+            log.warn("[RecommendationService] ML_SERVICE_KEY is not configured; skipping the "
+                    + "recommendation service and returning no recommendations.");
+            return true;
+        }
+        return false;
+    }
+
     private String toBrandModelKey(Car car) {
         return (car.getBrand() + "_" + car.getModel()).toLowerCase();
     }
 
     public List<Car> getRecommendedCars(Long carId) {
+        if (mlServiceUnconfigured()) {
+            return new ArrayList<>();
+        }
         Optional<Car> carOptional = carRepository.findById(carId);
         if (carOptional.isEmpty()) {
             return new ArrayList<>();
@@ -114,6 +130,9 @@ public class RecommendationService {
     }
 
     public List<Car> getPersonalizedRecommendations(Long userId) {
+        if (mlServiceUnconfigured()) {
+            return new ArrayList<>();
+        }
         com.arcarshowcaseserver.model.User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
             return new ArrayList<>();
@@ -209,6 +228,9 @@ public class RecommendationService {
     }
 
     private void relayFeedbackToPython(String carKey, String action) {
+        if (mlServiceUnconfigured()) {
+            return;
+        }
         String url = mlServiceUrl + "/recommend/feedback";
 
         HttpHeaders headers = new HttpHeaders();

@@ -35,6 +35,10 @@ services:
     build: ../recommendation-service
     environment:
       - APP_ENV=production
+      # Same value the app sends as X-ML-KEY. Both sides read it from here so they
+      # cannot drift: the service used to carry its own hardcoded copy, so setting
+      # ML_SERVICE_KEY for the app alone made every recommendation call 403.
+      - ML_SERVICE_KEY=${ML_SERVICE_KEY:?ML_SERVICE_KEY must be set}
     ports:
       # Loopback only. Reached by the app as http://recommendation:8000.
       - "127.0.0.1:8000:8000"
@@ -60,7 +64,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       BLENDER_SERVICE_URL: ${BLENDER_SERVICE_URL}
       ML_SERVICE_URL: http://recommendation:8000
-      ML_SERVICE_KEY: ${ML_SERVICE_KEY:-carshowcase_internal_2026}
+      ML_SERVICE_KEY: ${ML_SERVICE_KEY:?ML_SERVICE_KEY must be set}
       GROQ_API_KEY: ${GROQ_API_KEY}
     ports:
       # Loopback only so traffic has to arrive through nginx/Cloudflare.

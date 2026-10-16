@@ -2,7 +2,7 @@ package com.arcarshowcaseserver.service;
 
 import com.arcarshowcaseserver.dto.CarDTO;
 
-import java.util.Set;
+import java.util.List;
 
 public interface LikeService {
 
@@ -10,7 +10,7 @@ public interface LikeService {
 
     void unlikeCar(Long carId);
 
-    Set<CarDTO> getUserLikedCars();
+    List<CarDTO> getUserLikedCars();
 
     Boolean hasUserLikedCar(Long carId);
 }

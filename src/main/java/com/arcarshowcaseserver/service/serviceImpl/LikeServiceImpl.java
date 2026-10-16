@@ -13,11 +13,13 @@ import com.arcarshowcaseserver.repository.LikeRepository;
 import com.arcarshowcaseserver.repository.UserRepository;
 import com.arcarshowcaseserver.security.CurrentAuthenticatedUserService;
 import com.arcarshowcaseserver.service.LikeService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Service
 public class LikeServiceImpl implements LikeService {
@@ -39,6 +41,7 @@ public class LikeServiceImpl implements LikeService {
 
 
     @Override
+    @Transactional
     public void likeCar(Long carId) {
         User user = retriveLoggedInUser();
         Car car = carRepository.findById(carId).orElseThrow(
@@ -52,27 +55,35 @@ public class LikeServiceImpl implements LikeService {
         like.setCar(car);
         like.setUser(user);
         like.setLikedAt(LocalDateTime.now());
-        likeRepository.save(like);
+
+        try {
+            likeRepository.saveAndFlush(like);
+        } catch (DataIntegrityViolationException ex) {
+            // The check above cannot stop a second request that passed it at the same
+            // time; the unique index can. Losing that race means the car is liked,
+            // which is the same answer the pre-check gives.
+            throw new DuplicateLikeException("Car already liked");
+        }
     }
 
     @Override
+    @Transactional
     public void unlikeCar(Long carId) {
         User user = retriveLoggedInUser();
-        Car car = carRepository.findById(carId).orElseThrow(
-                ()-> new ResourceNotFoundException("Car not found with id: " + carId)
-        );
-        if (!likeRepository.existsByCarIdAndUserId(carId,user.getId())){
+        if (!carRepository.existsById(carId)) {
+            throw new ResourceNotFoundException("Car not found with id: " + carId);
+        }
+
+        int removed = likeRepository.deleteByCarIdAndUserId(carId, user.getId());
+        if (removed == 0) {
             throw new DuplicateLikeException("Car already unliked");
         }
-        Like like = likeRepository.findByCarAndUser(car,user);
-        likeRepository.delete(like);
     }
 
     @Override
-    public Set<CarDTO> getUserLikedCars() {
+    public List<CarDTO> getUserLikedCars() {
         User user = retriveLoggedInUser();
-        Set<CarDTO> carDTOS = likeRepository.findLikedCarsByUserId(user.getId());
-        return carDTOS;
+        return likeRepository.findLikedCarsByUserId(user.getId());
     }
 
 

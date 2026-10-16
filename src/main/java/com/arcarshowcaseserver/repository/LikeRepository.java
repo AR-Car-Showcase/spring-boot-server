@@ -5,15 +5,25 @@ import com.arcarshowcaseserver.model.Cars.Car;
 import com.arcarshowcaseserver.model.Cars.Like;
 import com.arcarshowcaseserver.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Set;
+import java.util.List;
 
 @Repository
 public interface LikeRepository extends JpaRepository<Like, Long> {
-    Like findByCarAndUser(Car car, User user);
+    /**
+     * Deletes the like in a single statement and reports how many rows went, so an
+     * unlike never has to read the row first. The read-then-delete it replaces could
+     * find the row, lose it to a concurrent unlike, and then fail with a 500 - either
+     * an optimistic-locking error or a null entity, depending on the timing. It also
+     * clears any duplicate rows an earlier like race already left behind.
+     */
+    @Modifying
+    @Query("DELETE FROM Like l WHERE l.car.id = :carId AND l.user.id = :userId")
+    int deleteByCarIdAndUserId(@Param("carId") Long carId, @Param("userId") Long userId);
 
 
     @Query("""
@@ -32,7 +42,10 @@ public interface LikeRepository extends JpaRepository<Like, Long> {
         WHERE l.user.id = :userId
         ORDER BY l.likedAt DESC
         """)
-    Set<CarDTO> findLikedCarsByUserId(@Param("userId") Long userId);
+    // Declared as a List because the result is ordered. A Set-returning query happens
+    // to arrive as a LinkedHashSet today, so the order survived, but the type said
+    // "unordered" while the query promised otherwise.
+    List<CarDTO> findLikedCarsByUserId(@Param("userId") Long userId);
 
     boolean existsByCarAndUser(Car car, User user);
 

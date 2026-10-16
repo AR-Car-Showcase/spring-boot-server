@@ -14,7 +14,13 @@ import java.time.LocalDateTime;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "car_likes")
+@Table(
+        name = "car_likes",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_car_likes_user_car",
+                columnNames = {"user_id", "car_id"}
+        )
+)
 public class Like {
     @Id
     @GeneratedValue
